@@ -46,5 +46,13 @@
   },
   "overrides": {
     "@electron/rebuild": "4.0.3"
+  },
+  "allowScripts": {
+    "electron@40.0.0": true,
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.27.2": true,
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true
   }
 }
