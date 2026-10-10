@@ -262,7 +262,14 @@ export function buildThinkingProviderOptions(
     }
 
     case 'google': {
-      return { google: { thinkingConfig: { thinkingBudget: budgetTokens } } };
+      // Gemini deprecated thinking_budget; thinking_level supports low/medium/high
+      const thinkingLevelMap: Record<ThinkingLevel, string> = {
+        low: 'low',
+        medium: 'medium',
+        high: 'high',
+        xhigh: 'high',
+      };
+      return { google: { thinkingConfig: { thinkingLevel: thinkingLevelMap[thinkingLevel] } } };
     }
 
     case 'zai': {
