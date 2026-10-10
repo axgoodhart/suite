@@ -20,7 +20,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createXai } from '@ai-sdk/xai';
 import type { LanguageModel } from 'ai';
 
-import { MODEL_PROVIDER_MAP } from '../config/types';
+import { MODEL_PROVIDER_MAP, isGpt6Model } from '../config/types';
 import { createOAuthProviderFetch } from './oauth-fetch';
 import { type ProviderConfig, SupportedProvider } from './types';
 
@@ -214,9 +214,10 @@ export function createProvider(options: CreateProviderOptions): LanguageModel {
   // OpenAI: Codex OAuth accounts rewrite ALL URLs to the Codex Responses endpoint,
   // so every model must use `.responses()` to avoid a format mismatch (Chat Completions
   // format sent to Responses endpoint → 400). Regular API-key accounts use
-  // `.responses()` for Codex models and `.chat()` for everything else.
+  // `.responses()` for Codex and GPT-6 models (GPT-6 tool calling requires the
+  // Responses API) and `.chat()` for everything else.
   if (config.provider === SupportedProvider.OpenAI) {
-    if (config.oauthTokenFilePath || isCodexModel(modelId)) {
+    if (config.oauthTokenFilePath || isCodexModel(modelId) || isGpt6Model(modelId)) {
       return (instance as ReturnType<typeof createOpenAI>).responses(modelId);
     }
     return (instance as ReturnType<typeof createOpenAI>).chat(modelId);

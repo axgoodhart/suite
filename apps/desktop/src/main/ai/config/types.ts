@@ -84,7 +84,30 @@ export const EFFORT_LEVEL_MAP: Record<EffortLevel, string> = {
  */
 export const ADAPTIVE_THINKING_MODELS: ReadonlySet<string> = new Set([
   'claude-opus-4-6',
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
+  'claude-haiku-5-5',
 ]);
+
+/**
+ * Models that only accept adaptive thinking.
+ * These reject `thinking: { type: 'enabled', budgetTokens }` with a 400 and are
+ * steered by `effort` instead.
+ */
+export const ADAPTIVE_ONLY_THINKING_MODELS: ReadonlySet<string> = new Set([
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
+  'claude-haiku-5-5',
+]);
+
+/**
+ * OpenAI GPT-6 family (gpt-6.1-sol, gpt-6-luna). Tool calling requires the
+ * Responses API, and the pinned @ai-sdk/openai does not recognize these IDs
+ * as reasoning models, so reasoning must be forced.
+ */
+export function isGpt6Model(modelId: string): boolean {
+  return /^gpt-6(?:[.-]|$)/.test(modelId);
+}
 
 // ============================================
 // Phase Configuration Types
@@ -205,6 +228,11 @@ export function buildThinkingProviderOptions(
 
   switch (provider) {
     case 'anthropic': {
+      if (ADAPTIVE_ONLY_THINKING_MODELS.has(modelId)) {
+        // @ai-sdk/anthropic's effort enum tops out at 'max' (no 'xhigh')
+        const effort = thinkingLevel === 'xhigh' ? 'max' : thinkingLevel;
+        return { anthropic: { thinking: { type: 'adaptive' }, effort } };
+      }
       const base: Record<string, unknown> = {
         thinking: { type: 'enabled', budgetTokens },
       };
@@ -218,6 +246,9 @@ export function buildThinkingProviderOptions(
     }
 
     case 'openai': {
+      if (isGpt6Model(modelId)) {
+        return { openai: { forceReasoning: true, reasoningEffort: thinkingLevel } };
+      }
       if (modelId.startsWith('o1-') || modelId.startsWith('o3-') || modelId.startsWith('o4-')) {
         const effortMap: Record<ThinkingLevel, string> = {
           low: 'low',

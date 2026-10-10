@@ -38,12 +38,17 @@ export interface ModelOption {
 
 export const ALL_AVAILABLE_MODELS: ModelOption[] = [
   // Anthropic
+  { value: 'claude-opus-5-5', label: 'Claude Opus 5.5', provider: 'anthropic', description: 'Most capable', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1000000 } },
+  { value: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', provider: 'anthropic', description: 'Balanced', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1000000 } },
+  { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', provider: 'anthropic', description: 'Fast', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1000000 } },
   { value: 'opus', label: 'Claude Opus 4.6', provider: 'anthropic', description: 'Most capable', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 200000 } },
   { value: 'opus-1m', label: 'Claude Opus 4.6 (1M)', provider: 'anthropic', description: '1M context', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1000000 } },
   { value: 'sonnet', label: 'Claude Sonnet 4.6', provider: 'anthropic', description: 'Balanced', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 200000 } },
   { value: 'opus-4.5', label: 'Claude Opus 4.5', provider: 'anthropic', description: 'Legacy', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 200000 } },
   { value: 'haiku', label: 'Claude Haiku 4.5', provider: 'anthropic', description: 'Fast', capabilities: { thinking: false, tools: true, vision: true, contextWindow: 200000 } },
   // OpenAI
+  { value: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', provider: 'openai', description: 'Flagship', apiKeyOnly: true, capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1050000 } },
+  { value: 'gpt-6-luna', label: 'GPT-6 Luna', provider: 'openai', description: 'Fast & cheap', apiKeyOnly: true, capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1050000 } },
   { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', provider: 'openai', description: 'Agentic coding', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1047576 } },
   { value: 'gpt-5.2', label: 'GPT-5.2', provider: 'openai', description: 'Flagship', apiKeyOnly: true, capabilities: { thinking: true, tools: true, vision: true, contextWindow: 400000 } },
   { value: 'gpt-5.2-codex', label: 'GPT-5.2 Codex', provider: 'openai', description: 'Coding', capabilities: { thinking: true, tools: true, vision: true, contextWindow: 1047576 } },
@@ -357,7 +362,7 @@ export function getProviderPresetOrFallback(provider: BuiltinProvider, presetId:
 export const FAST_MODE_MODELS: readonly string[] = ['opus', 'opus-1m'] as const;
 
 // Models that use adaptive thinking (Opus dynamically decides how much to think within the budget cap)
-export const ADAPTIVE_THINKING_MODELS: readonly string[] = ['opus', 'opus-1m'] as const;
+export const ADAPTIVE_THINKING_MODELS: readonly string[] = ['opus', 'opus-1m', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'] as const;
 
 // Valid thinking levels for validation
 export const VALID_THINKING_LEVELS = ['low', 'medium', 'high', 'xhigh'] as const;
@@ -452,7 +457,32 @@ export const DEFAULT_MODEL_EQUIVALENCES: Record<string, Partial<Record<BuiltinPr
     groq: { modelId: 'llama-3.3-70b-versatile', reasoning: { type: 'none' } },
     zai: { modelId: 'glm-4.5-flash', reasoning: { type: 'none' } },
   },
+  'claude-opus-5-5': {
+    anthropic: { modelId: 'claude-opus-5-5', reasoning: { type: 'adaptive_effort', level: 'high' } },
+    openai: { modelId: 'gpt-6.1-sol', reasoning: { type: 'reasoning_effort', level: 'high' } },
+    google: { modelId: 'gemini-2.5-pro', reasoning: { type: 'thinking_toggle', level: 'high' } },
+  },
+  'claude-sonnet-5-5': {
+    anthropic: { modelId: 'claude-sonnet-5-5', reasoning: { type: 'adaptive_effort', level: 'medium' } },
+    openai: { modelId: 'gpt-6.1-sol', reasoning: { type: 'reasoning_effort', level: 'medium' } },
+    google: { modelId: 'gemini-2.5-flash', reasoning: { type: 'thinking_toggle', level: 'medium' } },
+  },
+  'claude-haiku-5-5': {
+    anthropic: { modelId: 'claude-haiku-5-5', reasoning: { type: 'adaptive_effort', level: 'low' } },
+    openai: { modelId: 'gpt-6-luna', reasoning: { type: 'reasoning_effort', level: 'low' } },
+    google: { modelId: 'gemini-2.5-flash-lite', reasoning: { type: 'thinking_toggle', level: 'low' } },
+  },
   // ── OpenAI models ─────────────────────────────────────────────────────────
+  'gpt-6.1-sol': {
+    openai: { modelId: 'gpt-6.1-sol', reasoning: { type: 'reasoning_effort', level: 'high' } },
+    anthropic: { modelId: 'claude-opus-5-5', reasoning: { type: 'adaptive_effort', level: 'high' } },
+    google: { modelId: 'gemini-2.5-pro', reasoning: { type: 'thinking_toggle', level: 'high' } },
+  },
+  'gpt-6-luna': {
+    openai: { modelId: 'gpt-6-luna', reasoning: { type: 'reasoning_effort', level: 'low' } },
+    anthropic: { modelId: 'claude-haiku-5-5', reasoning: { type: 'adaptive_effort', level: 'low' } },
+    google: { modelId: 'gemini-2.5-flash-lite', reasoning: { type: 'thinking_toggle', level: 'low' } },
+  },
   'gpt-5.3-codex': {
     openai: { modelId: 'gpt-5.3-codex', reasoning: { type: 'reasoning_effort', level: 'high' } },
     anthropic: { modelId: 'claude-opus-4-6', reasoning: { type: 'adaptive_effort', level: 'high' } },
