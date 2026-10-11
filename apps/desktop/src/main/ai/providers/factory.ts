@@ -18,10 +18,12 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createXai } from '@ai-sdk/xai';
+import { wrapLanguageModel } from 'ai';
 import type { LanguageModel } from 'ai';
 
 import { MODEL_PROVIDER_MAP, isGpt6Model } from '../config/types';
 import { createOAuthProviderFetch } from './oauth-fetch';
+import { codexSubscriptionMiddleware } from './subscription-middleware';
 import { type ProviderConfig, SupportedProvider } from './types';
 
 // =============================================================================
@@ -217,7 +219,14 @@ export function createProvider(options: CreateProviderOptions): LanguageModel {
   // `.responses()` for Codex and GPT-6 models (GPT-6 tool calling requires the
   // Responses API) and `.chat()` for everything else.
   if (config.provider === SupportedProvider.OpenAI) {
-    if (config.oauthTokenFilePath || isCodexModel(modelId) || isGpt6Model(modelId)) {
+    if (config.oauthTokenFilePath) {
+      // Subscription endpoint: system prompt as `instructions`, `store: false`.
+      return wrapLanguageModel({
+        model: (instance as ReturnType<typeof createOpenAI>).responses(modelId),
+        middleware: codexSubscriptionMiddleware,
+      });
+    }
+    if (isCodexModel(modelId) || isGpt6Model(modelId)) {
       return (instance as ReturnType<typeof createOpenAI>).responses(modelId);
     }
     return (instance as ReturnType<typeof createOpenAI>).chat(modelId);

@@ -364,6 +364,7 @@ export async function resolveApiKeyFallback(
   requestedModel: string,
   queue: ProviderAccount[],
   primary: QueueResolvedAuth,
+  userModelOverrides?: Record<string, Partial<Record<BuiltinProvider, import('../../../shared/constants/models').ProviderModelSpec>>>,
 ): Promise<QueueResolvedAuth | null> {
   const primaryAccount = queue.find((a) => a.id === primary.accountId);
   if (!primaryAccount || primaryAccount.authType !== 'oauth') return null;
@@ -371,7 +372,7 @@ export async function resolveApiKeyFallback(
     (a) => a.provider === primaryAccount.provider && a.authType === 'api-key',
   );
   if (apiKeyAccounts.length === 0) return null;
-  return resolveAuthFromQueue(requestedModel, apiKeyAccounts);
+  return resolveAuthFromQueue(requestedModel, apiKeyAccounts, { userModelOverrides });
 }
 
 /**

@@ -21,8 +21,8 @@ import {
 
 describe('MODEL_ID_MAP', () => {
   it('should map all model shorthands', () => {
-    expect(MODEL_ID_MAP.opus).toBe('claude-opus-4-6');
-    expect(MODEL_ID_MAP['opus-1m']).toBe('claude-opus-4-6');
+    expect(MODEL_ID_MAP.opus).toBe('claude-opus-5-5');
+    expect(MODEL_ID_MAP['opus-1m']).toBe('claude-opus-5-5');
     expect(MODEL_ID_MAP['opus-4.5']).toBeDefined();
     expect(MODEL_ID_MAP.sonnet).toBeDefined();
     expect(MODEL_ID_MAP.haiku).toBeDefined();
@@ -96,7 +96,7 @@ describe('resolveModelId', () => {
   });
 
   it('should resolve shorthands to model IDs', () => {
-    expect(resolveModelId('opus')).toBe('claude-opus-4-6');
+    expect(resolveModelId('opus')).toBe('claude-opus-5-5');
     expect(resolveModelId('sonnet')).toMatch(/^claude-sonnet/);
     expect(resolveModelId('haiku')).toMatch(/^claude-haiku/);
   });
@@ -129,10 +129,8 @@ describe('resolveModelId', () => {
 });
 
 describe('getModelBetas', () => {
-  it('should return betas for opus-1m', () => {
-    const betas = getModelBetas('opus-1m');
-    expect(betas).toHaveLength(1);
-    expect(betas[0]).toContain('context-1m');
+  it('should not need a 1M-context beta for opus-1m (Opus 5.5 is 1M natively)', () => {
+    expect(getModelBetas('opus-1m')).toEqual([]);
   });
 
   it('should return empty array for models without betas', () => {

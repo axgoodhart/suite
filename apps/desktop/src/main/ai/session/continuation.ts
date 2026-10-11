@@ -16,6 +16,7 @@
  * continuations — they call `runSingleSession()` which uses this wrapper.
  */
 
+import type { LanguageModel } from 'ai';
 import { generateText } from 'ai';
 
 import { runAgentSession } from './runner';
@@ -62,6 +63,12 @@ export interface ContinuationConfig {
   baseURL?: string;
   /** OAuth token file path (for token refresh) */
   oauthTokenFilePath?: string;
+  /**
+   * Model used to summarize the conversation before continuing. Should be a
+   * cheap model on the session's own provider/account. When omitted, Claude
+   * Haiku is used with the credentials above (Anthropic accounts only).
+   */
+  summarizerModel?: LanguageModel;
 }
 
 /**
@@ -223,7 +230,7 @@ async function compactSessionMessages(
   try {
     // Use Haiku for summarization — fast and cheap
     const { createProviderFromModelId } = await import('../providers/factory');
-    const summarizerModel = createProviderFromModelId('claude-haiku-5-5', {
+    const summarizerModel = continuationConfig.summarizerModel ?? createProviderFromModelId('claude-haiku-5-5', {
       apiKey: continuationConfig.apiKey,
       baseURL: continuationConfig.baseURL,
       oauthTokenFilePath: continuationConfig.oauthTokenFilePath,

@@ -11,6 +11,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 vi.mock('../../auth/resolver', () => ({
   resolveAuth: vi.fn().mockResolvedValue({ apiKey: 'sk-default', source: 'environment' }),
   resolveAuthFromQueue: vi.fn().mockResolvedValue(null),
+  resolveApiKeyFallback: vi.fn().mockResolvedValue(null),
   buildDefaultQueueConfig: vi.fn().mockReturnValue(undefined),
 }));
 

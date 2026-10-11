@@ -32,10 +32,29 @@ describe('buildThinkingProviderOptions', () => {
     });
   });
 
-  it('should return Google thinking options for Gemini models', () => {
+  it('should return Google thinking_level options for Gemini models', () => {
     const result = buildThinkingProviderOptions('gemini-2.5-pro', 'medium');
     expect(result).toEqual({
-      google: { thinkingConfig: { thinkingBudget: 4096 } },
+      google: { thinkingConfig: { thinkingLevel: 'medium' } },
+    });
+    // Gemini's highest level is 'high'
+    expect(buildThinkingProviderOptions('gemini-3.8-flash', 'xhigh')).toEqual({
+      google: { thinkingConfig: { thinkingLevel: 'high' } },
+    });
+  });
+
+  it('should return adaptive thinking + effort for Claude 5.5 models (no budget)', () => {
+    expect(buildThinkingProviderOptions('claude-opus-5-5', 'high')).toEqual({
+      anthropic: { thinking: { type: 'adaptive' }, effort: 'high' },
+    });
+    expect(buildThinkingProviderOptions('claude-haiku-5-5', 'xhigh')).toEqual({
+      anthropic: { thinking: { type: 'adaptive' }, effort: 'max' },
+    });
+  });
+
+  it('should force reasoning with an effort for GPT-6 models', () => {
+    expect(buildThinkingProviderOptions('gpt-6.1-sol', 'xhigh')).toEqual({
+      openai: { forceReasoning: true, reasoningEffort: 'xhigh' },
     });
   });
 

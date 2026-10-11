@@ -14,7 +14,7 @@
 
 import type { Tool as AITool } from 'ai';
 
-import { resolveAuth, resolveAuthFromQueue, buildDefaultQueueConfig } from '../auth/resolver';
+import { resolveAuth, resolveAuthFromQueue, resolveApiKeyFallback, buildDefaultQueueConfig } from '../auth/resolver';
 import {
   getDefaultThinkingLevel,
   getRequiredMcpServers,
@@ -26,6 +26,8 @@ import { resolveReasoningParams } from '../config/types';
 import { createMcpClientsForAgent, closeAllMcpClients, mergeMcpTools } from '../mcp/client';
 import type { McpClientResult } from '../mcp/types';
 import { createProvider, detectProviderFromModel } from '../providers/factory';
+import { withApiKeyFallback } from '../providers/subscription-middleware';
+import type { ProviderAccount } from '../../../shared/types/provider-account';
 import { buildToolRegistry } from '../tools/build-registry';
 import type { QueueResolvedAuth } from '../auth/types';
 import type {
@@ -48,6 +50,44 @@ const DEFAULT_SIMPLE_MAX_STEPS = 1;
 // =============================================================================
 // createAgentClient
 // =============================================================================
+
+/**
+ * Build the model for a queue-resolved account. When the account is a
+ * subscription (OAuth) and an API-key account for the same provider exists,
+ * a rejected request (usage limit, auth, model not on plan) is retried on the
+ * API key.
+ */
+async function createQueueModel(
+  queueAuth: QueueResolvedAuth,
+  queue: ProviderAccount[],
+  requestedModel: string,
+  userModelOverrides?: Parameters<typeof resolveApiKeyFallback>[3],
+) {
+  const primary = createProvider({
+    config: {
+      provider: queueAuth.resolvedProvider,
+      apiKey: queueAuth.apiKey,
+      baseURL: queueAuth.baseURL,
+      headers: queueAuth.headers,
+      oauthTokenFilePath: queueAuth.oauthTokenFilePath,
+    },
+    modelId: queueAuth.resolvedModelId,
+  });
+  const fallback = await resolveApiKeyFallback(requestedModel, queue, queueAuth, userModelOverrides);
+  if (!fallback) return primary;
+  const fallbackModel = createProvider({
+    config: {
+      provider: fallback.resolvedProvider,
+      apiKey: fallback.apiKey,
+      baseURL: fallback.baseURL,
+      headers: fallback.headers,
+    },
+    modelId: fallback.resolvedModelId,
+  });
+  return withApiKeyFallback(primary, fallbackModel, (error) => {
+    console.warn(`[ClientFactory] Subscription account ${queueAuth.accountId} rejected the request; using API key account ${fallback.accountId}:`, error instanceof Error ? error.message : error);
+  });
+}
 
 /**
  * Create a fully configured agent client with tools, MCP servers, and security.
@@ -111,16 +151,12 @@ export async function createAgentClient(
     // Use createProvider() with the queue-resolved provider to avoid re-detecting
     // from model ID prefix. This is critical for providers like Ollama whose models
     // (e.g., 'llama3.1:8b') don't follow predictable prefix conventions.
-    model = createProvider({
-      config: {
-        provider: queueAuth.resolvedProvider,
-        apiKey: queueAuth.apiKey,
-        baseURL: queueAuth.baseURL,
-        headers: queueAuth.headers,
-        oauthTokenFilePath: queueAuth.oauthTokenFilePath,
-      },
-      modelId: queueAuth.resolvedModelId,
-    });
+    model = await createQueueModel(
+      queueAuth,
+      queueConfig.queue,
+      queueConfig.requestedModel,
+      queueConfig.userModelOverrides as Parameters<typeof resolveApiKeyFallback>[3],
+    );
 
     // Derive thinking level from reasoning config
     resolveReasoningParams(queueAuth.reasoningConfig);
@@ -251,16 +287,12 @@ export async function createSimpleClient(
     // Use createProvider() with the queue-resolved provider to avoid re-detecting
     // from model ID prefix. This is critical for providers like Ollama whose models
     // (e.g., 'llama3.1:8b') don't follow predictable prefix conventions.
-    model = createProvider({
-      config: {
-        provider: queueAuth.resolvedProvider,
-        apiKey: queueAuth.apiKey,
-        baseURL: queueAuth.baseURL,
-        headers: queueAuth.headers,
-        oauthTokenFilePath: queueAuth.oauthTokenFilePath,
-      },
-      modelId: resolvedModelId,
-    });
+    model = await createQueueModel(
+      queueAuth,
+      queueConfig.queue,
+      queueConfig.requestedModel,
+      userModelOverrides as Parameters<typeof resolveApiKeyFallback>[3],
+    );
 
     resolveReasoningParams(queueAuth.reasoningConfig);
     resolvedThinkingLevel = (queueAuth.reasoningConfig.level as ThinkingLevel) ?? thinkingLevel;

@@ -237,7 +237,7 @@ export interface TaskMetadata {
   phaseModels?: PhaseModelConfig;  // Per-phase model configuration
   phaseThinking?: PhaseThinkingConfig;  // Per-phase thinking configuration
   phaseProviders?: Record<string, string>;  // Per-phase provider preference (cross-provider mode)
-  fastMode?: boolean;  // Fast Mode — faster Opus 4.6 output, higher cost per token
+  fastMode?: boolean;  // Fast Mode — faster Opus 5.5 output, higher cost per token
 
   // Git/Worktree configuration
   baseBranch?: string;  // Override base branch for this task's worktree

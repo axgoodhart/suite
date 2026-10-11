@@ -359,7 +359,7 @@ export function getProviderPresetOrFallback(provider: BuiltinProvider, presetId:
 }
 
 // Models that support Fast Mode (same model, faster API routing, higher cost)
-export const FAST_MODE_MODELS: readonly string[] = ['opus', 'opus-1m'] as const;
+export const FAST_MODE_MODELS: readonly string[] = ['opus', 'opus-1m', 'claude-opus-5-5'] as const;
 
 // Models that use adaptive thinking (Opus dynamically decides how much to think within the budget cap)
 export const ADAPTIVE_THINKING_MODELS: readonly string[] = ['opus', 'opus-1m', 'sonnet', 'haiku'] as const;

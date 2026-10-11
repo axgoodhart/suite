@@ -47,6 +47,8 @@ import {
   refreshOAuthTokenReactive,
   resolveAuthFromQueue,
   buildDefaultQueueConfig,
+  preferSubscriptionAccounts,
+  resolveApiKeyFallback,
 } from '../resolver';
 
 const mockEnsureValidToken = vi.mocked(ensureValidToken);
@@ -503,5 +505,86 @@ describe('buildDefaultQueueConfig', () => {
 
     expect(result?.queue[0].id).toBe('x');
     expect(result?.queue[1].id).toBe('y');
+  });
+});
+
+// =============================================================================
+// Subscription first, API key fallback
+// =============================================================================
+
+describe('preferSubscriptionAccounts', () => {
+  const acct = (id: string, provider: 'openai' | 'anthropic', authType: 'oauth' | 'api-key') => ({
+    id,
+    provider,
+    authType,
+    name: id,
+    billingModel: authType === 'oauth' ? ('subscription' as const) : ('pay-per-use' as const),
+    createdAt: 0,
+    updatedAt: 0,
+  });
+
+  it('tries subscription accounts before API-key accounts of the same provider', () => {
+    const queue = [
+      acct('oai-key', 'openai', 'api-key'),
+      acct('ant-key', 'anthropic', 'api-key'),
+      acct('oai-sub', 'openai', 'oauth'),
+      acct('ant-sub', 'anthropic', 'oauth'),
+    ];
+    expect(preferSubscriptionAccounts(queue as any).map((a) => a.id)).toEqual([
+      'oai-sub',
+      'ant-sub',
+      'oai-key',
+      'ant-key',
+    ]);
+  });
+
+  it('keeps the provider order and the order within each group', () => {
+    const queue = [
+      acct('ant-sub', 'anthropic', 'oauth'),
+      acct('oai-key-1', 'openai', 'api-key'),
+      acct('oai-key-2', 'openai', 'api-key'),
+      acct('oai-sub', 'openai', 'oauth'),
+    ];
+    expect(preferSubscriptionAccounts(queue as any).map((a) => a.id)).toEqual([
+      'ant-sub',
+      'oai-sub',
+      'oai-key-1',
+      'oai-key-2',
+    ]);
+  });
+});
+
+describe('resolveApiKeyFallback', () => {
+  const sub = { id: 'oai-sub', provider: 'openai' as const, authType: 'oauth' as const, name: 'sub', billingModel: 'subscription' as const, createdAt: 0, updatedAt: 0 };
+  const key = { id: 'oai-key', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'sk-fallback', name: 'key', billingModel: 'pay-per-use' as const, createdAt: 0, updatedAt: 0 };
+  const otherKey = { ...key, id: 'ant-key', provider: 'anthropic' as const, apiKey: 'sk-ant' };
+
+  beforeEach(() => {
+    mockScoreProviderAccount.mockReturnValue({ available: true, score: 100 });
+    mockResolveModelEquivalent.mockReturnValue({ modelId: 'gpt-6.1-sol', reasoning: { type: 'reasoning_effort', level: 'high' } });
+  });
+
+  const primaryFor = (accountId: string) => ({
+    apiKey: '',
+    source: 'codex-oauth' as const,
+    accountId,
+    resolvedProvider: 'openai' as const,
+    resolvedModelId: 'gpt-6.1-sol',
+    reasoningConfig: { type: 'reasoning_effort' as const, level: 'high' as const },
+  });
+
+  it('returns the API-key account of the same provider for a subscription primary', async () => {
+    const fallback = await resolveApiKeyFallback('gpt-6.1-sol', [sub, otherKey, key] as any, primaryFor('oai-sub'));
+    expect(fallback?.accountId).toBe('oai-key');
+    expect(fallback?.apiKey).toBe('sk-fallback');
+    expect(fallback?.resolvedModelId).toBe('gpt-6.1-sol');
+  });
+
+  it('returns null when the primary is already an API-key account', async () => {
+    expect(await resolveApiKeyFallback('gpt-6.1-sol', [key, sub] as any, primaryFor('oai-key'))).toBeNull();
+  });
+
+  it('returns null when there is no API-key account for that provider', async () => {
+    expect(await resolveApiKeyFallback('gpt-6.1-sol', [sub, otherKey] as any, primaryFor('oai-sub'))).toBeNull();
   });
 });

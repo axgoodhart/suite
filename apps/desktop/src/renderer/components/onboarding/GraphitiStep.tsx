@@ -493,7 +493,7 @@ export function GraphitiStep({ onNext, onBack, onSkip }: GraphitiStepProps) {
                   type="text"
                   value={config.azureOpenaiLlmDeployment}
                   onChange={(e) => setConfig(prev => ({ ...prev, azureOpenaiLlmDeployment: e.target.value }))}
-                  placeholder="gpt-4"
+                  placeholder="gpt-6-luna"
                   className="font-mono text-sm"
                   disabled={isSaving || isValidating}
                 />

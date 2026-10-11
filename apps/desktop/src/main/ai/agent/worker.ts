@@ -18,10 +18,11 @@ import { join, basename } from 'node:path';
 import { runAgentSession } from '../session/runner';
 import { runContinuableSession } from '../session/continuation';
 import { createProvider } from '../providers/factory';
+import { withApiKeyFallback, withFastMode, FAST_MODE_MODEL_IDS } from '../providers/subscription-middleware';
 import type { SupportedProvider } from '../providers/types';
-import { getModelContextWindow } from '../../../shared/constants/models';
+import { getModelContextWindow, resolveModelEquivalent } from '../../../shared/constants/models';
+import type { BuiltinProvider } from '../../../shared/types/provider-account';
 import { refreshOAuthTokenReactive } from '../auth/resolver';
-import type { QueueResolvedAuth } from '../auth/types';
 import { buildToolRegistry } from '../tools/build-registry';
 import type { ToolRegistry } from '../tools/registry';
 import { SubagentExecutorImpl } from '../orchestration/subagent-executor';
@@ -43,7 +44,7 @@ import type { SpecPhase } from '../orchestration/spec-orchestrator';
 import type { AgentType } from '../config/agent-configs';
 import type { Phase } from '../config/types';
 import type { ExecutionPhase } from '../../../shared/constants/phase-protocol';
-import { getPhaseThinking } from '../config/phase-config';
+import { getPhaseThinking, getFastMode } from '../config/phase-config';
 import { TaskLogWriter } from '../logging/task-log-writer';
 import { loadProjectInstructions, injectContext } from '../prompts/prompt-loader';
 import { createMcpClientsForAgent, mergeMcpTools, closeAllMcpClients } from '../mcp/client';
@@ -128,33 +129,56 @@ parentPort.on('message', (msg: MainToWorkerMessage) => {
  * SecurityProfile uses Set objects that can't cross worker boundaries.
  */
 /**
- * Runner options that switch a run from the subscription account to the
- * pre-resolved API-key fallback, once, when the subscription rejects it.
+ * Build the session's model. A subscription account with an API-key fallback
+ * is wrapped so a rejected request (usage limit, auth, model not on plan) is
+ * retried on the API key, for every call made with this model (main loop,
+ * subagents, structured output, summarization).
  */
-function buildAccountSwitchOptions(session: SerializableSessionConfig): {
-  currentAccountId?: string;
-  onAccountSwitch?: () => Promise<QueueResolvedAuth | null>;
-} {
-  const fallback = session.fallbackAuth;
-  if (!fallback || !session.accountId) return {};
-  let used = false;
-  return {
-    currentAccountId: session.accountId,
-    onAccountSwitch: async () => {
-      if (used) return null;
-      used = true;
-      postLog(`Subscription account rejected the request; retrying with API key account ${fallback.accountId}`);
-      return {
-        apiKey: fallback.apiKey ?? '',
-        baseURL: fallback.baseURL,
-        source: 'profile-api-key',
-        accountId: fallback.accountId,
-        resolvedProvider: fallback.provider as SupportedProvider,
-        resolvedModelId: fallback.modelId,
-        reasoningConfig: { type: 'none' },
-      };
+function createSessionModel(
+  session: SerializableSessionConfig,
+  modelId: string = session.modelId,
+  options: { fastMode?: boolean } = {},
+) {
+  // Fast Mode (task setting) applies to Opus models that support it
+  const fast = (provider: string, id: string, model: ReturnType<typeof createProvider>) =>
+    options.fastMode && provider === 'anthropic' && FAST_MODE_MODEL_IDS.has(id)
+      ? withFastMode(model, (error) => {
+          postLog(`Fast mode unavailable (${error instanceof Error ? error.message : String(error)}); continuing at standard speed`);
+        })
+      : model;
+
+  const primary = fast(session.provider, modelId, createProvider({
+    config: {
+      provider: session.provider as SupportedProvider,
+      apiKey: session.apiKey,
+      baseURL: session.baseURL,
+      oauthTokenFilePath: session.oauthTokenFilePath,
     },
-  };
+    modelId,
+  }));
+  const fallback = session.fallbackAuth;
+  if (!fallback) return primary;
+  const fallbackModelId = modelId === session.modelId ? fallback.modelId : modelId;
+  const fallbackModel = fast(fallback.provider, fallbackModelId, createProvider({
+    config: {
+      provider: fallback.provider as SupportedProvider,
+      apiKey: fallback.apiKey,
+      baseURL: fallback.baseURL,
+    },
+    modelId: fallbackModelId,
+  }));
+  return withApiKeyFallback(primary, fallbackModel, (error) => {
+    postLog(`Subscription account rejected the request (${error instanceof Error ? error.message : String(error)}); continuing with API key account ${fallback.accountId}`);
+  });
+}
+
+/**
+ * Cheap model on the session's own provider for conversation summaries
+ * (the 'haiku' equivalent), falling back to the session model.
+ */
+function createSummarizerModel(session: SerializableSessionConfig) {
+  const spec = resolveModelEquivalent('haiku', session.provider as BuiltinProvider);
+  return createSessionModel(session, spec?.modelId ?? session.modelId);
 }
 
 function buildSecurityProfile(session: SerializableSessionConfig): SecurityProfile {
@@ -294,15 +318,7 @@ async function runSingleSession(
   const phaseModelId = baseSession.modelId;
   const phaseThinking = await getPhaseThinking(specDir, phase);
 
-  const model = createProvider({
-    config: {
-      provider: baseSession.provider as SupportedProvider,
-      apiKey: baseSession.apiKey,
-      baseURL: baseSession.baseURL,
-      oauthTokenFilePath: baseSession.oauthTokenFilePath,
-    },
-    modelId: phaseModelId,
-  });
+  const model = createSessionModel(baseSession, phaseModelId, { fastMode: await getFastMode(specDir) });
 
   const tools: Record<string, AITool> = {
     ...registry.getToolsForAgent(agentType, toolContext),
@@ -359,8 +375,7 @@ async function runSingleSession(
         projectId: config.projectId,
       });
     },
-    ...buildAccountSwitchOptions(baseSession),
-    onAuthRefresh: baseSession.configDir
+        onAuthRefresh: baseSession.configDir
       ? () => refreshOAuthTokenReactive(baseSession.configDir as string)
       : undefined,
     onModelRefresh: baseSession.configDir
@@ -382,6 +397,7 @@ async function runSingleSession(
       apiKey: baseSession.apiKey,
       baseURL: baseSession.baseURL,
       oauthTokenFilePath: baseSession.oauthTokenFilePath,
+      summarizerModel: createSummarizerModel(baseSession),
     });
   } catch (error) {
     // Ensure log cleanup happens on failure
@@ -478,15 +494,7 @@ async function runDefaultSession(
   toolContext: ToolContext,
   registry: ToolRegistry,
 ): Promise<void> {
-  const model = createProvider({
-    config: {
-      provider: session.provider as SupportedProvider,
-      apiKey: session.apiKey,
-      baseURL: session.baseURL,
-      oauthTokenFilePath: session.oauthTokenFilePath,
-    },
-    modelId: session.modelId,
-  });
+  const model = createSessionModel(session, session.modelId, { fastMode: await getFastMode(session.specDir) });
 
   const tools: Record<string, AITool> = {
     ...registry.getToolsForAgent(session.agentType, toolContext),
@@ -536,8 +544,7 @@ async function runDefaultSession(
           projectId: config.projectId,
         });
       },
-      ...buildAccountSwitchOptions(session),
-      onAuthRefresh: session.configDir
+            onAuthRefresh: session.configDir
         ? () => refreshOAuthTokenReactive(session.configDir as string)
         : undefined,
       onModelRefresh: session.configDir
@@ -555,6 +562,7 @@ async function runDefaultSession(
       apiKey: session.apiKey,
       baseURL: session.baseURL,
       oauthTokenFilePath: session.oauthTokenFilePath,
+      summarizerModel: createSummarizerModel(session),
     });
   } finally {
     if (logWriter) {
@@ -1040,15 +1048,7 @@ async function runAgenticSpecOrchestrator(
   }
 
   // Create the SubagentExecutor
-  const model = createProvider({
-    config: {
-      provider: session.provider as SupportedProvider,
-      apiKey: session.apiKey,
-      baseURL: session.baseURL,
-      oauthTokenFilePath: session.oauthTokenFilePath,
-    },
-    modelId: session.modelId,
-  });
+  const model = createSessionModel(session, session.modelId, { fastMode: await getFastMode(session.specDir) });
 
   const executor = new SubagentExecutorImpl({
     model,
@@ -1133,8 +1133,7 @@ async function runAgenticSpecOrchestrator(
           projectId: config.projectId,
         });
       },
-      ...buildAccountSwitchOptions(session),
-      onAuthRefresh: session.configDir
+            onAuthRefresh: session.configDir
         ? () => refreshOAuthTokenReactive(session.configDir as string)
         : undefined,
       onModelRefresh: session.configDir
@@ -1152,6 +1151,7 @@ async function runAgenticSpecOrchestrator(
       apiKey: session.apiKey,
       baseURL: session.baseURL,
       oauthTokenFilePath: session.oauthTokenFilePath,
+      summarizerModel: createSummarizerModel(session),
     });
   } finally {
     if (logWriter) {

@@ -259,7 +259,7 @@
     "requireReviewDescription": "When enabled, you'll be prompted to review the spec and implementation plan before the coding phase begins. This allows you to approve, request changes, or provide feedback.",
     "fastModeLabel": "Fast Mode",
     "fastModeDescription": "Same Opus 5.5 model with faster output. Higher cost per token.",
-    "fastModeNotice": "Requires \"extra usage\" enabled on your Claude subscription.",
+    "fastModeNotice": "Requires fast mode access on your Claude account (\"extra usage\" on subscriptions). If it isn't available, the task runs at standard speed.",
     "errors": {
       "descriptionRequired": "Please provide a description",
       "maxImagesReached": "Maximum of 5 images allowed",
