@@ -18,6 +18,7 @@ import type { SimpleClientResult } from '../client/types';
 import { buildToolRegistry } from '../tools/build-registry';
 import type { ToolContext } from '../tools/types';
 import type { ModelShorthand, ThinkingLevel } from '../config/types';
+import { usesCodexRequestShape } from '../config/types';
 import type { SecurityProfile } from '../security/bash-validator';
 import { safeParseJson } from '../../utils/json-repair';
 import { tryLoadPrompt } from '../prompts/prompt-loader';
@@ -115,7 +116,7 @@ async function runDiscoveryPhase(
 
   // Detect Codex models — they require instructions via providerOptions, not system
   const discoveryModelId = typeof client.model === 'string' ? client.model : client.model.modelId;
-  const isCodexDiscovery = discoveryModelId?.includes('codex') ?? false;
+  const isCodexDiscovery = usesCodexRequestShape(discoveryModelId);
 
   // Load the full prompt file with JSON schema; fall back to inline prompt
   const loadedDiscoveryPrompt = tryLoadPrompt('roadmap_discovery');
@@ -237,7 +238,7 @@ async function runFeaturesPhase(
 
   // Detect Codex models — they require instructions via providerOptions, not system
   const featuresModelId = typeof client.model === 'string' ? client.model : client.model.modelId;
-  const isCodexFeatures = featuresModelId?.includes('codex') ?? false;
+  const isCodexFeatures = usesCodexRequestShape(featuresModelId);
 
   // Load the full prompt file with JSON schema; fall back to inline prompt
   const loadedFeaturesPrompt = tryLoadPrompt('roadmap_features');

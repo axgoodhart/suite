@@ -19,6 +19,7 @@ import { createSimpleClient } from '../client/factory';
 import { buildToolRegistry } from '../tools/build-registry';
 import type { ToolContext } from '../tools/types';
 import type { ModelShorthand, ThinkingLevel } from '../config/types';
+import { usesCodexRequestShape } from '../config/types';
 import type { SecurityProfile } from '../security/bash-validator';
 import { safeParseJson } from '../../utils/json-repair';
 import { parseLLMJson } from '../schema/structured-output';
@@ -269,7 +270,7 @@ export async function runInsightsQuery(
 
   // Detect Codex models — they require instructions via providerOptions, not system
   const insightsModelId = typeof client.model === 'string' ? client.model : client.model.modelId;
-  const isCodexInsights = insightsModelId?.includes('codex') ?? false;
+  const isCodexInsights = usesCodexRequestShape(insightsModelId);
 
   try {
     const result = streamText({

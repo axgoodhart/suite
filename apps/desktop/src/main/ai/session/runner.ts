@@ -23,10 +23,10 @@ import type { WorkerObserverProxy } from '../memory/ipc/worker-observer-proxy';
 import { StepMemoryState } from '../memory/injection/step-memory-state';
 import { buildMemoryAwareStopCondition } from '../memory/injection/memory-stop-condition';
 
-import { buildThinkingProviderOptions } from '../config/types';
+import { buildThinkingProviderOptions, usesCodexRequestShape } from '../config/types';
 import { createStreamHandler } from './stream-handler';
 import type { FullStreamPart } from './stream-handler';
-import { classifyError, isAuthenticationError, isRateLimitError } from './error-classifier';
+import { classifyError, isAuthenticationError, isRateLimitError, isModelAccessError } from './error-classifier';
 import { ProgressTracker } from './progress-tracker';
 import type {
   SessionConfig,
@@ -167,10 +167,11 @@ export async function runAgentSession(
     } catch (error: unknown) {
       const { sessionError, outcome } = classifyError(error);
 
-      // Account-switch on rate limit (429) or auth failure (401)
+      // Account-switch on rate limit (429), auth failure (401), or the account
+      // refusing the model (e.g. not on the subscription plan)
       // This enables cross-provider fallback via the global priority queue
       if (
-        (isRateLimitError(error) || isAuthenticationError(error)) &&
+        (isRateLimitError(error) || isAuthenticationError(error) || isModelAccessError(error)) &&
         onAccountSwitch &&
         activeAccountId &&
         authRetries < MAX_AUTH_RETRIES
@@ -338,7 +339,7 @@ async function executeStream(
   // `instructions` in the request body instead of system messages in `input`.
   // Pass system prompt via providerOptions and enable store for proper Codex API behavior.
   const modelId = typeof config.model === 'string' ? config.model : config.model.modelId;
-  const isCodex = modelId?.includes('codex') ?? false;
+  const isCodex = usesCodexRequestShape(modelId);
   const isAnthropicModel = modelId?.startsWith('claude-') ?? false;
 
   // Compute thinking/reasoning provider options from session config

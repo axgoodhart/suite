@@ -35,11 +35,11 @@ export type Phase = 'spec' | 'planning' | 'coding' | 'qa';
  * - apps/desktop/src/shared/constants/models.ts MODEL_ID_MAP
  */
 export const MODEL_ID_MAP: Record<ModelShorthand, string> = {
-  opus: 'claude-opus-4-6',
-  'opus-1m': 'claude-opus-4-6',
+  opus: 'claude-opus-5-5',
+  'opus-1m': 'claude-opus-5-5',
   'opus-4.5': 'claude-opus-4-5-20251101',
-  sonnet: 'claude-sonnet-4-6',
-  haiku: 'claude-haiku-4-5-20251001',
+  sonnet: 'claude-sonnet-5-5',
+  haiku: 'claude-haiku-5-5',
 } as const;
 
 /**
@@ -47,7 +47,7 @@ export const MODEL_ID_MAP: Record<ModelShorthand, string> = {
  * Maps model shorthands that need special beta flags (e.g., 1M context window).
  */
 export const MODEL_BETAS_MAP: Partial<Record<ModelShorthand, string[]>> = {
-  'opus-1m': ['context-1m-2025-08-07'],
+  // Claude 5.5 has a 1M context window natively; no beta header needed
 } as const;
 
 // ============================================
@@ -107,6 +107,16 @@ export const ADAPTIVE_ONLY_THINKING_MODELS: ReadonlySet<string> = new Set([
  */
 export function isGpt6Model(modelId: string): boolean {
   return /^gpt-6(?:[.-]|$)/.test(modelId);
+}
+
+/**
+ * Models that take the system prompt as Responses `instructions` with
+ * `store: false`. Required on the Codex subscription endpoint, where GPT-6 is
+ * also served, and valid on the regular Responses API.
+ */
+export function usesCodexRequestShape(modelId: string | undefined): boolean {
+  if (!modelId) return false;
+  return modelId.includes('codex') || isGpt6Model(modelId);
 }
 
 // ============================================

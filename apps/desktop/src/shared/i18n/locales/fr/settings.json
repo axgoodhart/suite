@@ -104,11 +104,11 @@
       "haikuLabel": "Modèle Haiku (optionnel)",
       "sonnetLabel": "Modèle Sonnet (optionnel)",
       "opusLabel": "Modèle Opus (optionnel)",
-      "defaultPlaceholder": "ex. : claude-sonnet-4-6",
-      "haikuPlaceholder": "ex. : claude-haiku-4-5-20251001",
-      "sonnetPlaceholder": "ex. : claude-sonnet-4-6",
-      "opusPlaceholder": "ex. : claude-opus-4-6",
-      "opus1mPlaceholder": "ex. : claude-opus-4-6 (contexte 1M)"
+      "defaultPlaceholder": "ex. : claude-sonnet-5-5",
+      "haikuPlaceholder": "ex. : claude-haiku-5-5",
+      "sonnetPlaceholder": "ex. : claude-sonnet-5-5",
+      "opusPlaceholder": "ex. : claude-opus-5-5",
+      "opus1mPlaceholder": "ex. : claude-opus-5-5 (contexte 1M)"
     },
     "empty": {
       "title": "Aucun profil API configuré",

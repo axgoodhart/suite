@@ -17,7 +17,7 @@ import type { IdeationConfig } from '../../shared/types';
 import { resetStuckSubtasks } from '../ipc-handlers/task/plan-file-utils';
 import { AUTO_BUILD_PATHS, getSpecsDir } from '../../shared/constants';
 import { projectStore } from '../project-store';
-import { resolveAuth, resolveAuthFromQueue } from '../ai/auth/resolver';
+import { resolveAuth, resolveAuthFromQueue, resolveApiKeyFallback } from '../ai/auth/resolver';
 import { resolveModelId } from '../ai/config/phase-config';
 import { detectProviderFromModel } from '../ai/providers/factory';
 import { resolveModelEquivalent } from '../../shared/constants/models';
@@ -140,6 +140,8 @@ export class AgentManager extends EventEmitter {
     provider: string;
     modelId: string;
     configDir?: string;
+    accountId?: string;
+    fallbackAuth?: SerializableSessionConfig['fallbackAuth'];
   }> {
     // Read provider accounts and priority order from settings
     const settings = readSettingsFile();
@@ -176,11 +178,22 @@ export class AgentManager extends EventEmitter {
       const resolved = await resolveAuthFromQueue(requestedModel, orderedQueue);
       if (resolved) {
         console.warn(`[AgentManager] Resolved auth from provider queue: account=${resolved.accountId} provider=${resolved.resolvedProvider} model=${resolved.resolvedModelId}`);
+        const fallback = await resolveApiKeyFallback(requestedModel, orderedQueue, resolved);
         return {
           auth: resolved,
           provider: resolved.resolvedProvider,
           modelId: resolved.resolvedModelId,
           configDir: undefined, // Queue-based auth handles its own token refresh
+          accountId: resolved.accountId,
+          fallbackAuth: fallback
+            ? {
+                accountId: fallback.accountId,
+                provider: fallback.resolvedProvider,
+                modelId: fallback.resolvedModelId,
+                apiKey: fallback.apiKey,
+                baseURL: fallback.baseURL,
+              }
+            : undefined,
         };
       }
       console.warn('[AgentManager] No available account in provider queue, falling back to legacy profile');
@@ -395,6 +408,8 @@ export class AgentManager extends EventEmitter {
       baseURL: resolved.auth?.baseURL,
       configDir: resolved.configDir,
       oauthTokenFilePath: resolved.auth?.oauthTokenFilePath,
+      accountId: resolved.accountId,
+      fallbackAuth: resolved.fallbackAuth,
       mcpOptions: {
         context7Enabled: true,
         memoryEnabled: !!process.env.GRAPHITI_MCP_URL,
@@ -519,6 +534,8 @@ export class AgentManager extends EventEmitter {
       baseURL: resolved.auth?.baseURL,
       configDir: resolved.configDir,
       oauthTokenFilePath: resolved.auth?.oauthTokenFilePath,
+      accountId: resolved.accountId,
+      fallbackAuth: resolved.fallbackAuth,
       mcpOptions: {
         context7Enabled: true,
         memoryEnabled: !!process.env.GRAPHITI_MCP_URL,
@@ -622,6 +639,8 @@ export class AgentManager extends EventEmitter {
       baseURL: resolved.auth?.baseURL,
       configDir: resolved.configDir,
       oauthTokenFilePath: resolved.auth?.oauthTokenFilePath,
+      accountId: resolved.accountId,
+      fallbackAuth: resolved.fallbackAuth,
       mcpOptions: {
         context7Enabled: true,
         memoryEnabled: !!process.env.GRAPHITI_MCP_URL,

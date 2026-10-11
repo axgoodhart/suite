@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { streamText } from 'ai';
 import { createSimpleClient } from './ai/client/factory';
+import { usesCodexRequestShape } from './ai/config/types';
 import { getActiveProviderFeatureSettings } from './ipc-handlers/feature-settings-helper';
 import { safeBreadcrumb, safeCaptureException } from './sentry';
 
@@ -71,7 +72,7 @@ export class TitleGenerator extends EventEmitter {
 
       // Handle Codex models the same way as runner.ts:
       // Codex requires instructions field (not system messages in input) and store=false
-      const isCodex = client.resolvedModelId?.includes('codex') ?? false;
+      const isCodex = usesCodexRequestShape(client.resolvedModelId);
 
       const result = streamText({
         model: client.model,

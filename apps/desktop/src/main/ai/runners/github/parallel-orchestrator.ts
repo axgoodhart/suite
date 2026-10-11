@@ -25,7 +25,7 @@ import * as crypto from 'node:crypto';
 import { createSimpleClient } from '../../client/factory';
 import type { SimpleClientResult } from '../../client/types';
 import type { ModelShorthand, ThinkingLevel } from '../../config/types';
-import { buildThinkingProviderOptions } from '../../config/types';
+import { buildThinkingProviderOptions, usesCodexRequestShape } from '../../config/types';
 import { parseLLMJson } from '../../schema/structured-output';
 import { SpecialistOutputSchema, SynthesisResultSchema, FindingValidationArraySchema } from '../../schema/pr-review';
 import {
@@ -318,7 +318,7 @@ Return ONLY valid JSON (no markdown fencing):
 function buildGenerateTextOptions(
   client: SimpleClientResult,
 ): { system: string | undefined; providerOptions?: Record<string, Record<string, string | number | boolean | null>> } {
-  const isCodex = client.resolvedModelId?.includes('codex') ?? false;
+  const isCodex = usesCodexRequestShape(client.resolvedModelId);
 
   // Build thinking/reasoning provider options
   const thinkingOptions = client.thinkingLevel

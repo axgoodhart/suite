@@ -18,6 +18,7 @@ import { createSimpleClient } from '../client/factory';
 import { buildToolRegistry } from '../tools/build-registry';
 import type { ToolContext } from '../tools/types';
 import type { ModelShorthand, ThinkingLevel } from '../config/types';
+import { usesCodexRequestShape } from '../config/types';
 import type { SecurityProfile } from '../security/bash-validator';
 
 // =============================================================================
@@ -182,7 +183,7 @@ export async function runIdeation(
 
   // Detect Codex models — they require instructions via providerOptions, not system
   const modelId = typeof client.model === 'string' ? client.model : client.model.modelId;
-  const isCodex = modelId?.includes('codex') ?? false;
+  const isCodex = usesCodexRequestShape(modelId);
   const userPrompt = `Analyze the project at ${projectDir} and generate up to ${maxIdeasPerType} ${ideationType.replace(/_/g, ' ')} ideas. Use the available tools to explore the codebase, then write your findings as a JSON file to the output directory.`;
 
   try {

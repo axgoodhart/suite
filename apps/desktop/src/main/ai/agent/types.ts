@@ -61,6 +61,16 @@ export interface SerializableSessionConfig {
   configDir?: string;
   /** Pre-resolved path to OAuth token file for file-based OAuth providers (e.g., Codex). Worker-safe. */
   oauthTokenFilePath?: string;
+  /** Queue account ID of the primary auth (used for account switching) */
+  accountId?: string;
+  /** API-key account to switch to if the subscription account rejects a request */
+  fallbackAuth?: {
+    accountId: string;
+    provider: string;
+    modelId: string;
+    apiKey?: string;
+    baseURL?: string;
+  };
   /** MCP options resolved from project settings (serialized for worker) */
   mcpOptions?: {
     context7Enabled?: boolean;
