@@ -86,7 +86,7 @@ function getAutoFixConfig(project: Project): GitLabAutoFixConfig {
         enabled: data.auto_fix_enabled ?? false,
         labels: data.auto_fix_labels ?? ['auto-fix'],
         requireHumanApproval: data.require_human_approval ?? true,
-        model: data.model ?? 'claude-sonnet-4-6',
+        model: data.model ?? 'claude-sonnet-5-5',
         thinkingLevel: data.thinking_level ?? 'medium',
       };
     } catch {
@@ -98,7 +98,7 @@ function getAutoFixConfig(project: Project): GitLabAutoFixConfig {
     enabled: false,
     labels: ['auto-fix'],
     requireHumanApproval: true,
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5-5',
     thinkingLevel: 'medium',
   };
 }

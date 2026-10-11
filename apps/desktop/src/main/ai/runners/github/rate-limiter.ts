@@ -112,10 +112,16 @@ export class TokenBucket {
 
 /** AI model pricing per 1M tokens (USD) */
 const AI_PRICING: Record<string, { input: number; output: number }> = {
+  'claude-opus-5-5': { input: 4.0, output: 20.0 },
+  'claude-sonnet-5-5': { input: 2.0, output: 10.0 },
+  // Haiku 5.5 is tiered; this is the rate for prompts up to 100K tokens
+  'claude-haiku-5-5': { input: 0.1, output: 0.5 },
+  'gpt-6.1-sol': { input: 2.0, output: 10.0 },
+  'gpt-6-luna': { input: 0.1, output: 0.5 },
   'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
   'claude-opus-4-6': { input: 15.0, output: 75.0 },
   'claude-haiku-4-5-20251001': { input: 0.8, output: 4.0 },
-  default: { input: 3.0, output: 15.0 },
+  default: { input: 2.0, output: 10.0 },
 };
 
 interface CostOperation {

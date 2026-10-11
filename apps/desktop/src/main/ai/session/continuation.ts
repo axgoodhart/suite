@@ -223,7 +223,7 @@ async function compactSessionMessages(
   try {
     // Use Haiku for summarization — fast and cheap
     const { createProviderFromModelId } = await import('../providers/factory');
-    const summarizerModel = createProviderFromModelId('claude-haiku-4-5-20251001', {
+    const summarizerModel = createProviderFromModelId('claude-haiku-5-5', {
       apiKey: continuationConfig.apiKey,
       baseURL: continuationConfig.baseURL,
       oauthTokenFilePath: continuationConfig.oauthTokenFilePath,
