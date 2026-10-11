@@ -111,6 +111,26 @@ export function isAuthenticationError(error: unknown): boolean {
 }
 
 /**
+ * Check if an error is the account refusing the requested model (e.g. a
+ * subscription plan that doesn't include it). Another account may accept it.
+ */
+export function isModelAccessError(error: unknown): boolean {
+  const errorStr = errorToString(error);
+  if (!/\b(400|403|404)\b/.test(errorStr)) return false;
+  if (!errorStr.includes('model')) return false;
+  return [
+    'not supported',
+    'not available',
+    'unsupported',
+    'does not exist',
+    'not found',
+    'do not have access',
+    'does not have access',
+    'not allowed',
+  ].some((p) => errorStr.includes(p));
+}
+
+/**
  * Check if an error is a 400 tool concurrency error from Claude API.
  */
 export function isToolConcurrencyError(error: unknown): boolean {

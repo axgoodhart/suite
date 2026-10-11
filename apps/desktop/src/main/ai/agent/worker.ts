@@ -21,6 +21,7 @@ import { createProvider } from '../providers/factory';
 import type { SupportedProvider } from '../providers/types';
 import { getModelContextWindow } from '../../../shared/constants/models';
 import { refreshOAuthTokenReactive } from '../auth/resolver';
+import type { QueueResolvedAuth } from '../auth/types';
 import { buildToolRegistry } from '../tools/build-registry';
 import type { ToolRegistry } from '../tools/registry';
 import { SubagentExecutorImpl } from '../orchestration/subagent-executor';
@@ -126,6 +127,36 @@ parentPort.on('message', (msg: MainToWorkerMessage) => {
  * Reconstruct the SecurityProfile from the serialized form in session config.
  * SecurityProfile uses Set objects that can't cross worker boundaries.
  */
+/**
+ * Runner options that switch a run from the subscription account to the
+ * pre-resolved API-key fallback, once, when the subscription rejects it.
+ */
+function buildAccountSwitchOptions(session: SerializableSessionConfig): {
+  currentAccountId?: string;
+  onAccountSwitch?: () => Promise<QueueResolvedAuth | null>;
+} {
+  const fallback = session.fallbackAuth;
+  if (!fallback || !session.accountId) return {};
+  let used = false;
+  return {
+    currentAccountId: session.accountId,
+    onAccountSwitch: async () => {
+      if (used) return null;
+      used = true;
+      postLog(`Subscription account rejected the request; retrying with API key account ${fallback.accountId}`);
+      return {
+        apiKey: fallback.apiKey ?? '',
+        baseURL: fallback.baseURL,
+        source: 'profile-api-key',
+        accountId: fallback.accountId,
+        resolvedProvider: fallback.provider as SupportedProvider,
+        resolvedModelId: fallback.modelId,
+        reasoningConfig: { type: 'none' },
+      };
+    },
+  };
+}
+
 function buildSecurityProfile(session: SerializableSessionConfig): SecurityProfile {
   const serialized = session.toolContext.securityProfile;
   return {
@@ -328,6 +359,7 @@ async function runSingleSession(
         projectId: config.projectId,
       });
     },
+    ...buildAccountSwitchOptions(baseSession),
     onAuthRefresh: baseSession.configDir
       ? () => refreshOAuthTokenReactive(baseSession.configDir as string)
       : undefined,
@@ -504,6 +536,7 @@ async function runDefaultSession(
           projectId: config.projectId,
         });
       },
+      ...buildAccountSwitchOptions(session),
       onAuthRefresh: session.configDir
         ? () => refreshOAuthTokenReactive(session.configDir as string)
         : undefined,
@@ -1100,6 +1133,7 @@ async function runAgenticSpecOrchestrator(
           projectId: config.projectId,
         });
       },
+      ...buildAccountSwitchOptions(session),
       onAuthRefresh: session.configDir
         ? () => refreshOAuthTokenReactive(session.configDir as string)
         : undefined,

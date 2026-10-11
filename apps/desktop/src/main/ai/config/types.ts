@@ -109,6 +109,16 @@ export function isGpt6Model(modelId: string): boolean {
   return /^gpt-6(?:[.-]|$)/.test(modelId);
 }
 
+/**
+ * Models that take the system prompt as Responses `instructions` with
+ * `store: false`. Required on the Codex subscription endpoint, where GPT-6 is
+ * also served, and valid on the regular Responses API.
+ */
+export function usesCodexRequestShape(modelId: string | undefined): boolean {
+  if (!modelId) return false;
+  return modelId.includes('codex') || isGpt6Model(modelId);
+}
+
 // ============================================
 // Phase Configuration Types
 // ============================================

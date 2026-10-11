@@ -335,6 +335,46 @@ const BUILTIN_TO_SUPPORTED: Record<string, SupportedProvider> = {
 };
 
 /**
+ * Reorder the queue so that, within each provider, subscription (OAuth)
+ * accounts are tried before API-key accounts. The order between providers,
+ * and the order within each group, is unchanged.
+ */
+export function preferSubscriptionAccounts(queue: ProviderAccount[]): ProviderAccount[] {
+  const result = [...queue];
+  const providers = new Set(queue.map((a) => a.provider));
+  for (const provider of providers) {
+    const slots: number[] = [];
+    queue.forEach((a, i) => { if (a.provider === provider) slots.push(i); });
+    const group = slots.map((i) => queue[i]);
+    const ordered = [
+      ...group.filter((a) => a.authType === 'oauth'),
+      ...group.filter((a) => a.authType !== 'oauth'),
+    ];
+    slots.forEach((slot, j) => { result[slot] = ordered[j]; });
+  }
+  return result;
+}
+
+/**
+ * Resolve the API-key account to fall back to when a subscription account
+ * rejects a request (e.g. the model isn't available on the plan). Only
+ * API-key accounts of the same provider are considered.
+ */
+export async function resolveApiKeyFallback(
+  requestedModel: string,
+  queue: ProviderAccount[],
+  primary: QueueResolvedAuth,
+): Promise<QueueResolvedAuth | null> {
+  const primaryAccount = queue.find((a) => a.id === primary.accountId);
+  if (!primaryAccount || primaryAccount.authType !== 'oauth') return null;
+  const apiKeyAccounts = queue.filter(
+    (a) => a.provider === primaryAccount.provider && a.authType === 'api-key',
+  );
+  if (apiKeyAccounts.length === 0) return null;
+  return resolveAuthFromQueue(requestedModel, apiKeyAccounts);
+}
+
+/**
  * Resolve auth from the global priority queue.
  *
  * Algorithm:
@@ -366,7 +406,7 @@ export async function resolveAuthFromQueue(
   };
   const settings = options?.autoSwitchSettings ?? defaultSettings;
 
-  for (const account of queue) {
+  for (const account of preferSubscriptionAccounts(queue)) {
     // Skip excluded accounts
     if (excludeSet.has(account.id)) continue;
 
